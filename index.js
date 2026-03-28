@@ -9,7 +9,13 @@ const app = express();
 const PORT = process.env.PORT || 8000;
 
 // Middleware
-app.use(cors());
+app.use(
+  cors({
+    origin: ["https://portfolio-frontend-three-puce.vercel.app", "http://localhost:5173"],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 // Nodemailer Configuration
@@ -24,8 +30,15 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-await transporter.verify();
-console.log("SMTP working");
+// Verify connection
+transporter.verify()
+  .then(() => console.log("✅ Nodemailer ready (Port 587)"))
+  .catch((err) => {
+    console.error("❌ Nodemailer Setup Error:", err.message);
+    if (err.code === 'ETIMEDOUT' || err.errno === -101) {
+      console.warn("💡 TIP: SMTP (587/465) is blocked on Render Free Tier. Consider switching to Gmail API or a paid plan.");
+    }
+  });
 
 // OTP Storage (in-memory with expiration)
 const otpStore = new Map(); // { email: { otp, expiresAt } }
