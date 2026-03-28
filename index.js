@@ -24,6 +24,9 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+await transporter.verify();
+console.log("SMTP working");
+
 // OTP Storage (in-memory with expiration)
 const otpStore = new Map(); // { email: { otp, expiresAt } }
 const verifiedEmails = new Map(); // { email: { name, email, subject, message, verifiedAt } }
