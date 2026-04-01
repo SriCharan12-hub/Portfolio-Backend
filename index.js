@@ -2,7 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
-const { Resend } = require("resend");
+const nodemailer = require("nodemailer");
 const Contact = require("./models/Contact");
 
 const app = express();
@@ -18,10 +18,24 @@ app.use(
 );
 app.use(express.json());
 
-// Resend Configuration
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Nodemailer Configuration - Explicitly using Port 465 for SSL
+const transporter = nodemailer.createTransport({
+  host: "smtp.gmail.com",
+  port: 465,
+  secure: true, // Use SSL
+  auth: {
+    user: process.env.APP_EMAIL,
+    pass: process.env.APP_PASSWORD,
+  },
+});
 
-console.log("✅ Resend initialized");
+transporter.verify((error, success) => {
+  if (error) {
+    console.error("❌ Nodemailer verification failed:", error.message);
+  } else {
+    console.log("✅ Nodemailer ready to send emails");
+  }
+});
 
 // OTP Storage (in-memory with expiration)
 const otpStore = new Map(); // { email: { otp, expiresAt } }
@@ -34,8 +48,8 @@ function generateOTP() {
 
 // Helper function to send OTP email
 async function sendOTPEmail(email, otp) {
-  const { data, error } = await resend.emails.send({
-    from: "Portfolio <onboarding@resend.dev>",
+  const mailOptions = {
+    from: `"Portfolio" <${process.env.APP_EMAIL}>`,
     to: email,
     subject: "Your OTP for Portfolio Contact Form",
     html: `
@@ -45,10 +59,13 @@ async function sendOTPEmail(email, otp) {
       <p>This OTP will expire in 10 minutes.</p>
       <p>If you didn't request this, please ignore this email.</p>
     `,
-  });
+  };
 
-  if (error) {
-    throw new Error(error.message);
+  try {
+    await transporter.sendMail(mailOptions);
+  } catch (error) {
+    console.error("Nodemailer error:", error);
+    throw new Error("Failed to send email. Please try again later.");
   }
 }
 
@@ -148,8 +165,8 @@ app.post("/api/contact", async (req, res) => {
     await newContact.save();
 
     // Send email to your email address
-    const { data: emailData, error: emailError } = await resend.emails.send({
-      from: "Portfolio Contact <onboarding@resend.dev>",
+    const notificationMailOptions = {
+      from: `"Portfolio Contact" <${process.env.APP_EMAIL}>`,
       to: process.env.APP_EMAIL,
       subject: `New Contact Form Submission: ${subject}`,
       html: `
@@ -158,11 +175,13 @@ app.post("/api/contact", async (req, res) => {
         <p><strong>Email:</strong> ${email}</p>
         <p><strong>Subject:</strong> ${subject}</p>
         <p><strong>Message:</strong></p>
-        <p>${message.replace(/\n/g, '<br>')}</p>
+        <p>${message.replace(/\n/g, "<br>")}</p>
       `,
-    });
+    };
 
-    if (emailError) {
+    try {
+      await transporter.sendMail(notificationMailOptions);
+    } catch (emailError) {
       console.error("Error sending notification email:", emailError);
     }
 
