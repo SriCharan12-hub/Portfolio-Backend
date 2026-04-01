@@ -29,6 +29,11 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+// Verify environment variables (Debug)
+if (!process.env.APP_EMAIL || !process.env.APP_PASSWORD) {
+  console.error("❌ ERROR: Email credentials not found in .env file!");
+}
+
 transporter.verify((error, success) => {
   if (error) {
     console.error("❌ Nodemailer verification failed:", error.message);
